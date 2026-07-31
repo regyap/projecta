@@ -1,0 +1,13 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: allow-router-to-__APPLICATION_NAME__}
+spec:
+  podSelector:
+    matchLabels: {app: __APPLICATION_NAME__}
+  policyTypes: [Ingress]
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels: {network.openshift.io/policy-group: ingress}
+    ports:
+    - {protocol: TCP, port: 8080}

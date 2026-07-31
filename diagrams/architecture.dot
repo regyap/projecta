@@ -1,0 +1,38 @@
+digraph G {
+  graph [rankdir=TB, bgcolor="white", pad="0.3", nodesep="0.35", ranksep="0.55"];
+  node [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=10, fillcolor="#F4F7FB", color="#486581"];
+  edge [fontname="DejaVu Sans", fontsize=9, color="#486581"];
+
+  users [label="Developers / Platform Engineers"];
+  gitlab [label="GitLab CE on ROSA\nWebservice, Sidekiq, Gitaly, Runner controller", fillcolor="#FFF3E6"];
+  webhook [label="API Gateway\nGitLab webhook endpoint"];
+  lambda [label="Lambda\nValidate signature + normalize event"];
+  eventbridge [label="EventBridge\nDeployment event bus"];
+  sqs [label="SQS FIFO + DLQ\nDurable ordered delivery"];
+  controller [label="FastAPI deployment controller on ROSA\nIdempotency, rollout, rollback", fillcolor="#E8F5E9"];
+  apps [label="OpenShift namespaces\nDevelopment / Staging / Production"];
+  ddb [label="DynamoDB\nEvent and deployment state"];
+  s3 [label="S3\nArtifacts, evidence, backups"];
+  rds [label="RDS PostgreSQL\nGitLab metadata"];
+  redis [label="ElastiCache Redis\nQueues and cache"];
+  obs [label="CloudWatch + OpenShift monitoring\nLogs, metrics, alarms"];
+  sts [label="IAM roles + AWS STS\nTemporary least-privilege credentials"];
+
+  users -> gitlab [label="push / merge request"];
+  gitlab -> webhook [label="signed pipeline webhook"];
+  webhook -> lambda;
+  lambda -> eventbridge;
+  eventbridge -> sqs;
+  sqs -> controller;
+  controller -> apps [label="deploy / verify / rollback"];
+  lambda -> ddb [label="deduplicate"];
+  controller -> ddb [label="status"];
+  gitlab -> s3 [label="artifacts / backups"];
+  controller -> s3 [label="evidence"];
+  gitlab -> rds;
+  gitlab -> redis;
+  gitlab -> obs;
+  controller -> obs;
+  sts -> gitlab [dir=both, label="temporary AWS access"];
+  sts -> controller [dir=both];
+}

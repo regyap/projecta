@@ -1,0 +1,3 @@
+config/phase2.config.ps1
+*.log
+.env

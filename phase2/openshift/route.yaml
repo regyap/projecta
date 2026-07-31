@@ -1,0 +1,7 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata: {name: __APPLICATION_NAME__}
+spec:
+  to: {kind: Service, name: __APPLICATION_NAME__}
+  port: {targetPort: http}
+  tls: {termination: edge, insecureEdgeTerminationPolicy: Redirect}
