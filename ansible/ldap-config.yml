@@ -1,0 +1,18 @@
+---
+- name: Render a GitLab Linux-package LDAP configuration fragment
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - group_vars/ldap-example.yml
+  tasks:
+    - name: Create preview directory
+      ansible.builtin.file:
+        path: "{{ playbook_dir }}/../.rendered"
+        state: directory
+        mode: '0700'
+    - name: Render configuration without credentials or server changes
+      ansible.builtin.template:
+        src: gitlab-ldap.rb.j2
+        dest: "{{ playbook_dir }}/../.rendered/gitlab-ldap.rb"
+        mode: '0600'

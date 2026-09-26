@@ -1,38 +1,70 @@
-stages: [test, build, deploy, verify]
+stages: [test, build, scan, deploy, verify]
 variables:
-  IMAGE_TAG: "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"
-  OPENSHIFT_PROJECT: "gitlab-platform"
-  APPLICATION_NAME: "webhook-dashboard"
-test:
+  IMAGE_TAG: "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA"
+  OPENSHIFT_PROJECT: gitlab-platform
+  APPLICATION_NAME: webhook-dashboard
+unit-tests:
   stage: test
-  image: python:3.12
+  image: python:3.13-slim
   script:
-    - pip install -r app/requirements.txt
-    - python -m py_compile app/app.py
+    - pip install -r phase2/app/requirements.txt boto3 PyYAML
+    - python -m unittest discover -s tests -p 'test_*.py' -v
+source-scan:
+  stage: test
+  image:
+    name: aquasec/trivy:0.74.0
+    entrypoint: ['']
+  script:
+    - trivy fs --scanners vuln,secret --severity HIGH,CRITICAL --exit-code 1 .
 build:
   stage: build
-  image: docker:27
-  services: [docker:27-dind]
+  image:
+    name: moby/buildkit:v0.33.0-rootless
+    entrypoint: ['']
+  variables:
+    BUILDKITD_FLAGS: --oci-worker-no-process-sandbox
+  before_script:
+    - mkdir -p ~/.docker
+    - 'printf ''{"auths":{"%s":{"auth":"%s"}}}'' "$CI_REGISTRY" "$(printf ''%s:%s'' "$CI_REGISTRY_USER" "$CI_REGISTRY_PASSWORD" | base64 | tr -d ''\n'')" > ~/.docker/config.json'
   script:
-    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
-    - docker build -f app/Containerfile -t "$IMAGE_TAG" app
-    - docker push "$IMAGE_TAG"
+    - buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=phase2/app --local dockerfile=phase2/app --opt filename=Containerfile --output type=image,name=$IMAGE_TAG,push=true
+  after_script:
+    - rm -f ~/.docker/config.json
+image-scan:
+  stage: scan
+  image:
+    name: aquasec/trivy:0.74.0
+    entrypoint: ['']
+  variables:
+    TRIVY_USERNAME: "$CI_REGISTRY_USER"
+    TRIVY_PASSWORD: "$CI_REGISTRY_PASSWORD"
+  script:
+    - trivy image --severity HIGH,CRITICAL --exit-code 1 "$IMAGE_TAG"
+.openshift:
+  image: quay.io/openshift/origin-cli:4.20
+  before_script:
+    - test -n "$OPENSHIFT_SERVER" && test -n "$OPENSHIFT_TOKEN" && test -s "$OPENSHIFT_CA_FILE"
+    - oc login "$OPENSHIFT_SERVER" --token="$OPENSHIFT_TOKEN" --certificate-authority="$OPENSHIFT_CA_FILE"
+    - test "$(oc whoami --show-server)" = "$OPENSHIFT_SERVER"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true"'
 deploy:
+  extends: .openshift
   stage: deploy
-  image: quay.io/openshift/origin-cli:latest
+  resource_group: rosa-dev
+  environment: {name: dev}
+  when: manual
+  allow_failure: false
   script:
-    - oc login "$OPENSHIFT_SERVER" --token="$OPENSHIFT_TOKEN"
-    - oc project "$OPENSHIFT_PROJECT"
-    - sed "s|__APPLICATION_IMAGE__|$IMAGE_TAG|g; s|__APPLICATION_NAME__|$APPLICATION_NAME|g" openshift/deployment.yaml | oc apply -f -
-    - for f in service route hpa networkpolicy; do sed "s|__APPLICATION_NAME__|$APPLICATION_NAME|g" openshift/$f.yaml | oc apply -f -; done
-    - oc rollout status "deployment/$APPLICATION_NAME" --timeout=5m
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
+    - sed "s|__APPLICATION_IMAGE__|$IMAGE_TAG|g; s|__APPLICATION_NAME__|$APPLICATION_NAME|g" phase2/openshift/deployment.yaml | oc -n "$OPENSHIFT_PROJECT" apply -f -
+    - for f in service route hpa networkpolicy; do sed "s|__APPLICATION_NAME__|$APPLICATION_NAME|g" phase2/openshift/$f.yaml | oc -n "$OPENSHIFT_PROJECT" apply -f -; done
+    - oc -n "$OPENSHIFT_PROJECT" rollout status "deployment/$APPLICATION_NAME" --timeout=5m
 verify:
+  extends: .openshift
   stage: verify
-  image: quay.io/openshift/origin-cli:latest
   script:
-    - oc login "$OPENSHIFT_SERVER" --token="$OPENSHIFT_TOKEN"
-    - oc get all -n "$OPENSHIFT_PROJECT"
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
+    - oc -n "$OPENSHIFT_PROJECT" rollout status "deployment/$APPLICATION_NAME" --timeout=2m
+    - HOST=$(oc -n "$OPENSHIFT_PROJECT" get route "$APPLICATION_NAME" -o jsonpath='{.spec.host}')
+    - test -n "$HOST" && test -s "$APPLICATION_CA_FILE"
+    - curl --fail --silent --show-error --cacert "$APPLICATION_CA_FILE" "https://$HOST/readyz"
+    - curl --fail --silent --show-error --cacert "$APPLICATION_CA_FILE" "https://$HOST/" | grep 'ROSA Phase 2 application is running'

@@ -1,0 +1,39 @@
+---
+- name: Render or apply a moderate baseline to one application container
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    target_namespace: gitlab-platform
+    target_deployment: webhook-dashboard
+    container_name: app
+    read_only_root: true
+    apply_changes: false
+    expected_api_server: ""
+    rendered_dir: "{{ playbook_dir }}/../.rendered"
+  tasks:
+    - name: Validate scope
+      ansible.builtin.assert:
+        that:
+          - target_namespace is match('^[a-z0-9][a-z0-9-]*$')
+          - target_deployment is match('^[a-z0-9][a-z0-9-]*$')
+          - container_name is match('^[a-z0-9][a-z0-9-]*$')
+          - not (apply_changes | bool) or expected_api_server is match('^https://[^/]+(:[0-9]+)?$')
+    - name: Create local preview directory
+      ansible.builtin.file:
+        path: "{{ rendered_dir }}"
+        state: directory
+        mode: '0700'
+    - name: Render preview without contacting the cluster
+      ansible.builtin.template:
+        src: container-patch.yaml.j2
+        dest: "{{ rendered_dir }}/container-patch.yaml"
+        mode: '0600'
+    - name: Patch the named container without replacing the deployment
+      kubernetes.core.k8s:
+        host: "{{ expected_api_server }}"
+        validate_certs: true
+        state: present
+        merge_type: [strategic-merge]
+        definition: "{{ lookup('ansible.builtin.template', 'container-patch.yaml.j2') | from_yaml }}"
+      when: apply_changes | bool

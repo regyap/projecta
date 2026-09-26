@@ -162,6 +162,7 @@ resource "aws_dynamodb_table" "events" {
 resource "aws_sqs_queue" "deployment_dlq" {
   name                        = "${local.name}-deployment-dlq.fifo"
   fifo_queue                  = true
+  sqs_managed_sse_enabled      = true
   content_based_deduplication = true
   message_retention_seconds   = 1209600
   tags                        = local.tags
@@ -170,6 +171,7 @@ resource "aws_sqs_queue" "deployment_dlq" {
 resource "aws_sqs_queue" "deployment" {
   name                        = "${local.name}-deployment.fifo"
   fifo_queue                  = true
+  sqs_managed_sse_enabled      = true
   content_based_deduplication = true
   visibility_timeout_seconds  = 180
   redrive_policy = jsonencode({
@@ -199,12 +201,28 @@ resource "aws_cloudwatch_event_target" "deployment_queue" {
   event_bus_name = aws_cloudwatch_event_bus.deployment.name
   target_id      = "DeploymentQueue"
   arn            = aws_sqs_queue.deployment.arn
+  dead_letter_config { arn = aws_sqs_queue.event_delivery_dlq.arn }
+  depends_on = [aws_sqs_queue_policy.event_delivery_dlq]
   sqs_target {
     message_group_id = "deployment-events"
   }
 }
 
 data "aws_iam_policy_document" "queue_policy" {
+  statement {
+    effect = "Deny"
+    actions = ["sqs:*"]
+    resources = [aws_sqs_queue.deployment.arn]
+    principals {
+      type = "*"
+      identifiers = ["*"]
+    }
+    condition {
+      test = "Bool"
+      variable = "aws:SecureTransport"
+      values = ["false"]
+    }
+  }
   statement {
     effect    = "Allow"
     actions   = ["sqs:SendMessage"]
@@ -217,6 +235,11 @@ data "aws_iam_policy_document" "queue_policy" {
       test     = "ArnEquals"
       variable = "aws:SourceArn"
       values   = [aws_cloudwatch_event_rule.deployment_requested.arn]
+    }
+    condition {
+      test = "StringEquals"
+      variable = "aws:SourceAccount"
+      values = [data.aws_caller_identity.current.account_id]
     }
   }
 }
@@ -249,9 +272,16 @@ resource "aws_iam_role" "lambda" {
   tags               = local.tags
 }
 
-resource "aws_iam_role_policy_attachment" "lambda_logs" {
-  role       = aws_iam_role.lambda.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+resource "aws_iam_role_policy" "lambda_logs" {
+  role = aws_iam_role.lambda.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = ["logs:CreateLogStream", "logs:PutLogEvents"]
+      Resource = "${aws_cloudwatch_log_group.webhook.arn}:*"
+    }]
+  })
 }
 
 data "aws_iam_policy_document" "lambda_permissions" {
@@ -272,6 +302,7 @@ resource "aws_iam_role_policy" "lambda" {
 }
 
 resource "aws_lambda_function" "webhook" {
+  depends_on = [aws_cloudwatch_log_group.webhook, aws_iam_role_policy.lambda, aws_iam_role_policy.lambda_logs]
   function_name    = "${local.name}-webhook"
   role             = aws_iam_role.lambda.arn
   handler          = "webhook_handler.handler"
@@ -314,6 +345,10 @@ resource "aws_apigatewayv2_stage" "default" {
   api_id      = aws_apigatewayv2_api.webhook.id
   name        = "$default"
   auto_deploy = true
+  default_route_settings {
+    throttling_burst_limit = 10
+    throttling_rate_limit = 5
+  }
   tags        = local.tags
 }
 

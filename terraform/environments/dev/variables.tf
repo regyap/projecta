@@ -51,3 +51,23 @@ variable "private_subnet_cidrs" {
     "10.40.11.0/24"
   ]
 }
+
+variable "gitlab_oidc" {
+  type = object({
+    provider_arn = string
+    issuer       = string
+    project_path = string
+    branch       = string
+  })
+  default = null
+}
+variable "enable_media_pipeline" {
+  description = "Opt-in image labeling pipeline; creates billable resources."
+  type = bool
+  default = false
+}
+variable "enable_geolocation" {
+  description = "Allow consented reverse geocoding in the media worker."
+  type = bool
+  default = false
+}

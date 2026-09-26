@@ -95,3 +95,17 @@ pwsh -NoProfile -File tests/preflight.Tests.ps1
 ```
 
 These checks do not run `terraform apply` or inspect a live AWS account.
+
+## Architecture v2 controls and optional features
+
+The extension adds artifact bucket ownership/TLS controls, explicit queue encryption,
+DLQ redrive restrictions, EventBridge target-delivery DLQ, CloudWatch alarms/log retention,
+and HTTP API throttling. It replaces the webhook's broad logging attachment with an
+inline policy scoped to its own log group. Import that group first if it already exists;
+review bucket ownership changes against existing ACL users before applying.
+
+Optional root variables: `gitlab_oidc = null`, `enable_media_pipeline = false`,
+`enable_geolocation = false`. These defaults do not create a CI AWS role or the media
+pipeline. Geolocation has effect only when the media pipeline is also enabled.
+See [architecture v2](../docs/architecture-v2.md) for rollout, IAM and remaining work.
+Generated provider ZIPs must not be committed.

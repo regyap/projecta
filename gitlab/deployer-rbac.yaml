@@ -1,0 +1,49 @@
+# Bootstrap once as a namespace administrator, outside the application pipeline.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: gitlab-deployer
+  namespace: gitlab-platform
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: gitlab-app-deployer
+  namespace: gitlab-platform
+rules:
+  # Resource-name restrictions deliberately require initial app bootstrap by admin.
+  - apiGroups: [apps]
+    resources: [deployments]
+    resourceNames: [webhook-dashboard]
+    verbs: [get, patch, update, watch]
+  - apiGroups: ['']
+    resources: [services]
+    resourceNames: [webhook-dashboard]
+    verbs: [get, patch, update]
+  - apiGroups: [route.openshift.io]
+    resources: [routes]
+    resourceNames: [webhook-dashboard]
+    verbs: [get, patch, update]
+  - apiGroups: [autoscaling]
+    resources: [horizontalpodautoscalers]
+    resourceNames: [webhook-dashboard]
+    verbs: [get, patch, update]
+  - apiGroups: [networking.k8s.io]
+    resources: [networkpolicies]
+    resourceNames: [allow-router-to-webhook-dashboard]
+    verbs: [get, patch, update]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: gitlab-app-deployer
+  namespace: gitlab-platform
+subjects:
+  - kind: ServiceAccount
+    name: gitlab-deployer
+    namespace: gitlab-platform
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: gitlab-app-deployer
