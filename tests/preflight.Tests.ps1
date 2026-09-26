@@ -11,7 +11,8 @@ $PrivateSubnetId = 'subnet-private'
 
 function global:rosa {
     $global:LASTEXITCODE = 0
-    if (($global:Scenario -eq 'permissions' -and $args[1] -eq 'permissions') -or
+    if ($args[0] -eq 'verify' -and $args[1] -eq 'permissions') { throw 'Do not run non-STS permission verification for HCP.' }
+    if (($global:Scenario -eq 'authentication' -and $args[0] -eq 'whoami') -or
         ($global:Scenario -eq 'quota' -and $args[1] -eq 'quota')) {
         $global:LASTEXITCODE = 17
     }
@@ -72,7 +73,7 @@ try {
         valid = $null
         'main-fallback' = $null
         'aws-failure' = 'exit code 12'
-        permissions = 'exit code 17'
+        authentication = 'exit code 17'
         quota = 'exit code 17'
         'different-vpc' = 'same VPC and Availability Zone'
         'different-az' = 'same VPC and Availability Zone'

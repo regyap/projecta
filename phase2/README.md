@@ -9,13 +9,14 @@ ROSA creates billable AWS and Red Hat resources. Review pricing and quotas befor
 ```powershell
 Copy-Item .\config\phase2.config.example.ps1 .\config\phase2.config.ps1
 notepad .\config\phase2.config.ps1
+rosa login --use-auth-code
 .\scripts\00-preflight.ps1
-rosa login --token="<RED_HAT_OFFLINE_TOKEN>"
 .\scripts\01-create-account-roles.ps1
 .\scripts\02-create-oidc-and-operator-roles.ps1
 .\scripts\03-create-cluster.ps1
 .\scripts\04-watch-cluster.ps1
 .\scripts\05-create-admin.ps1
+# Run the oc login command printed above and wait for login to succeed.
 .\scripts\06-deploy-app.ps1
 .\scripts\07-verify.ps1
 ```

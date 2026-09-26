@@ -1,7 +1,8 @@
 # Troubleshooting
 
 - Enable ROSA in the AWS ROSA console before creating a cluster.
-- `rosa verify permissions` must pass for automatic IAM creation.
+- `rosa verify permissions` validates non-STS installations and is not an HCP/STS IAM readiness check. Verify the HCP account/operator roles and trust relationships during role setup.
+- Authenticate with `rosa login --use-auth-code` before preflight; after creating the cluster admin, run the printed `oc login` command before deploying.
 - For this Single-AZ example, the public and private subnets must belong to the same VPC and Availability Zone.
 - The VPC CIDR must match `MachineCidr`.
 - Phase 1 now supports NAT egress (`enable_nat_gateway = true`). Apply it with the original Terraform state, then run `scripts/00-preflight.ps1`. See [network setup](../../terraform/README.md#rosa-network-egress).

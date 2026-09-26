@@ -8,7 +8,8 @@ Require-ConfiguredValue "PrivateSubnetId" $PrivateSubnetId
 
 Invoke-CheckedNative aws @('sts', 'get-caller-identity', '--region', $AwsRegion, '--no-cli-pager')
 Invoke-CheckedNative rosa @('version')
-Invoke-CheckedNative rosa @('verify', 'permissions', '--region', $AwsRegion)
+# rosa verify permissions targets non-STS clusters, not this HCP/STS lab.
+# HCP IAM roles and trust must be checked during the account/operator role setup.
 Invoke-CheckedNative rosa @('verify', 'quota', '--region', $AwsRegion)
 Invoke-CheckedNative rosa @('whoami')
 
@@ -76,4 +77,4 @@ if ($natGateways.Count -ne 1 -or $natGateways[0].State -ne 'available' -or $natG
 # The shared NAT may be in another AZ; check its actual subnet as well.
 Require-InternetRoute $natGateways[0].SubnetId
 Write-Host 'Preflight passed: CLI prerequisites and the lab NAT routing checks passed.'
-Write-Host 'This does not verify security groups, NACLs, endpoint reachability, available IP capacity, or cluster installation health.'
+Write-Host 'This does not verify HCP IAM roles/trust, security groups, NACLs, endpoint reachability, available IP capacity, or cluster installation health.'
