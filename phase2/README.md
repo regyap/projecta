@@ -24,3 +24,6 @@ Cleanup:
 ```powershell
 .\scripts\99-delete-cluster.ps1
 ```
+
+
+Before creating the cluster, [apply and verify Phase 1 NAT egress](../terraform/README.md#rosa-network-egress), select a matched subnet pair, and run `scripts/00-preflight.ps1`.

@@ -5,3 +5,10 @@ if (-not (Test-Path $ConfigPath)) { throw "Missing $ConfigPath. Copy phase2.conf
 . $ConfigPath
 function Require-Command { param([string]$Name); if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) { throw "Required command '$Name' is not installed or not in PATH." } }
 function Require-ConfiguredValue { param([string]$Name,[string]$Value); if ([string]::IsNullOrWhiteSpace($Value) -or $Value -match "REPLACE") { throw "Set '$Name' in config\phase2.config.ps1." } }
+function Invoke-CheckedNative {
+    param([string]$Command, [string[]]$Arguments)
+    & $Command @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "'$Command' failed with exit code $LASTEXITCODE. Preflight cannot continue."
+    }
+}

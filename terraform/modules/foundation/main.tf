@@ -16,6 +16,13 @@ resource "aws_vpc" "this" {
   enable_dns_support   = true
   enable_dns_hostnames = true
   tags                 = merge(local.tags, { Name = "${local.name}-vpc" })
+
+  lifecycle {
+    precondition {
+      condition     = length(var.public_subnet_cidrs) == length(var.availability_zones) && length(var.private_subnet_cidrs) == length(var.availability_zones)
+      error_message = "Provide one public and one private subnet CIDR for each Availability Zone."
+    }
+  }
 }
 
 resource "aws_internet_gateway" "this" {
@@ -72,6 +79,30 @@ resource "aws_route_table_association" "public" {
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.this.id
   tags   = merge(local.tags, { Name = "${local.name}-private-rt" })
+}
+
+# Single NAT is intentional for this development lab. The existing shared
+# private route table and subnet addresses are retained to avoid replacements.
+resource "aws_eip" "nat" {
+  count  = var.enable_nat_gateway ? 1 : 0
+  domain = "vpc"
+  tags   = merge(local.tags, { Name = "${local.name}-nat-eip" })
+}
+
+resource "aws_nat_gateway" "this" {
+  count         = var.enable_nat_gateway ? 1 : 0
+  allocation_id = aws_eip.nat[0].id
+  subnet_id     = aws_subnet.public[var.availability_zones[0]].id
+  tags          = merge(local.tags, { Name = "${local.name}-nat" })
+
+  depends_on = [aws_internet_gateway.this, aws_route_table_association.public]
+}
+
+resource "aws_route" "private_default" {
+  count                  = var.enable_nat_gateway ? 1 : 0
+  route_table_id         = aws_route_table.private.id
+  destination_cidr_block = "0.0.0.0/0"
+  nat_gateway_id         = aws_nat_gateway.this[0].id
 }
 
 resource "aws_route_table_association" "private" {

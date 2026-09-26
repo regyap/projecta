@@ -1,0 +1,34 @@
+name: Network checks
+on:
+  pull_request:
+    paths: ['terraform/**', 'lambda/**', 'phase2/scripts/**', 'tests/**', '.github/workflows/network-checks.yml']
+  push:
+    branches: ['codex/rosa-network-egress', 'main']
+    paths: ['terraform/**', 'lambda/**', 'phase2/scripts/**', 'tests/**', '.github/workflows/network-checks.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+      - name: Terraform init and validate (no AWS credentials)
+        working-directory: terraform/environments/dev
+        run: |
+          terraform init -backend=false -input=false -lockfile=readonly
+          terraform validate
+          terraform test
+      - name: Parse PowerShell scripts and test preflight failure paths
+        shell: pwsh
+        run: |
+          Get-ChildItem phase2/scripts/*.ps1, tests/*.ps1 | ForEach-Object {
+            $parseErrors = $null
+            $tokens = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$parseErrors) | Out-Null
+            if ($parseErrors.Count -gt 0) { throw ($parseErrors | Out-String) }
+          }
+          ./tests/preflight.Tests.ps1

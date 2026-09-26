@@ -1,1 +1,3 @@
 webhook_secret = "replace-with-a-long-random-secret"
+# One shared NAT gateway; adds ongoing NAT and public IPv4 charges when applied.
+enable_nat_gateway = true
