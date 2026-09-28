@@ -1,0 +1,22 @@
+# Optional job to add to .gitlab-ci.yml after configuring the Terraform OIDC role.
+# The AWS role can ONLY put objects under ci/ in the foundation artifact bucket.
+publish-evidence:
+  stage: verify
+  image:
+    name: amazon/aws-cli:2.31.0
+    entrypoint: ['']
+  id_tokens:
+    GITLAB_OIDC_TOKEN:
+      aud: sts.amazonaws.com
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true"'
+  script:
+    - test -n "$AWS_ROLE_ARN" && test -n "$ARTIFACT_BUCKET" && test -n "$AWS_REGION"
+    - umask 077
+    - printf '%s' "$GITLAB_OIDC_TOKEN" > "$CI_PROJECT_DIR/.oidc-token"
+    - export AWS_WEB_IDENTITY_TOKEN_FILE="$CI_PROJECT_DIR/.oidc-token"
+    - export AWS_ROLE_SESSION_NAME="gitlab-$CI_PROJECT_ID-$CI_PIPELINE_ID"
+    - printf '%s\n' "$CI_COMMIT_SHA" > commit.txt
+    - aws s3api put-object --bucket "$ARTIFACT_BUCKET" --key "ci/$CI_PROJECT_ID/$CI_PIPELINE_ID/commit.txt" --body commit.txt --server-side-encryption AES256
+  after_script:
+    - rm -f "$CI_PROJECT_DIR/.oidc-token"

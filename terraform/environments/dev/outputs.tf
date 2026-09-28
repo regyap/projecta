@@ -15,3 +15,6 @@ output "foundation" {
   }
 }
 
+
+output "gitlab_artifact_role_arn" { value = module.foundation.gitlab_artifact_role_arn }
+output "media" { value = try(module.media[0].configuration, null) }

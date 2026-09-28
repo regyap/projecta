@@ -3,6 +3,7 @@ WORKDIR /opt/app-root/src
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY app.py .
-ENV APP_ENV=dev
+ENV APP_ENV=dev PYTHONDONTWRITEBYTECODE=1 HOME=/tmp
 EXPOSE 8080
 CMD ["gunicorn","--bind","0.0.0.0:8080","--workers","2","app:app"]
+

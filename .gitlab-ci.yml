@@ -1,0 +1,2 @@
+include:
+  - local: phase2/.gitlab-ci.yml

@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ target_deployment }}
+  namespace: {{ target_namespace }}
+spec:
+  template:
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: {{ container_name }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: {{ read_only_root | bool | lower }}
+            capabilities:
+              drop: [ALL]
+          env:
+            - name: PYTHONDONTWRITEBYTECODE
+              value: '1'
+            - name: HOME
+              value: /tmp
+          volumeMounts:
+            - name: runtime-tmp
+              mountPath: /tmp
+      volumes:
+        - name: runtime-tmp
+          emptyDir:
+            sizeLimit: 64Mi

@@ -1,0 +1,23 @@
+# Include from an existing /etc/gitlab/gitlab.rb. Never replace the whole file.
+# JSON string literals are valid Ruby strings and escape configuration values.
+gitlab_rails['ldap_enabled'] = true
+gitlab_rails['ldap_servers'] = {
+  'main' => {
+    'label' => 'Corporate AD',
+    'host' => {{ ldap_host | to_json }},
+    'port' => 636,
+    'uid' => 'sAMAccountName',
+    'base' => {{ ldap_base | to_json }},
+    'bind_dn' => {{ ldap_bind_dn | to_json }},
+    'password' => File.read({{ ldap_bind_password_file | to_json }}).strip,
+    'encryption' => 'simple_tls',
+    'verify_certificates' => true,
+    'tls_options' => { 'ca_file' => {{ ldap_ca_file | to_json }} },
+    'active_directory' => true,
+    'user_filter' => {{ ldap_user_filter | to_json }},
+    'allow_username_or_email_login' => false,
+    'block_auto_created_users' => true,
+    'lowercase_usernames' => true,
+    'timeout' => 10
+  }
+}

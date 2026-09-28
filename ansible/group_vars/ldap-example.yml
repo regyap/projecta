@@ -1,0 +1,7 @@
+---
+ldap_host: ad.example.internal
+ldap_base: DC=example,DC=internal
+ldap_bind_dn: CN=svc-gitlab,OU=ServiceAccounts,DC=example,DC=internal
+ldap_user_filter: '(memberOf=CN=GitLab-Users,OU=Groups,DC=example,DC=internal)'
+ldap_ca_file: /etc/gitlab/trusted-certs/ad-ca.crt
+ldap_bind_password_file: /etc/gitlab/ldap-bind.secret
