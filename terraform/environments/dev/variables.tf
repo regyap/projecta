@@ -3,6 +3,12 @@ variable "project_name" {
   default = "rosa-gitlab"
 }
 
+variable "enable_nat_gateway" {
+  description = "Enable the lab's shared NAT gateway. Disable only for Phase 1 without ROSA or when separately managing egress."
+  type        = bool
+  default     = true
+}
+
 variable "environment" {
   type    = string
   default = "dev"
